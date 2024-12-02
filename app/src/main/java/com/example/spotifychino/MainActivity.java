@@ -3,6 +3,7 @@ package com.example.spotifychino;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -86,14 +87,25 @@ public class MainActivity extends AppCompatActivity {
     public void pausa(){
         if(reproductor.isPlaying()){
             reproductor.pause();
+            handlertask = null;
         }else{
             reproductor.start();
+            startimer();
         }
     }
 
     public boolean parar(){
         if(reproductor.isPlaying()){
             reproductor.stop();
+            try{
+                reproductor.prepare();
+            }catch (Exception e){
+                Log.i("error", "No se pudo parar correctamente");
+            }
+            reproductor.seekTo(0);
+            handlertask = null;
+            reproduciendo.setText(formato(0));
+            barra.setProgress(0);
         }
         return true;
     }
@@ -101,34 +113,57 @@ public class MainActivity extends AppCompatActivity {
     public void anterior(){
         if(reproductor.isPlaying()){
             if(musica == 0){
-                musica = playlist.size() + 1;
+                musica = playlist.size() - 1;
                 reproductor.stop();
                 reproductor.release();
+                handlertask = null;
                 reproductor = MediaPlayer.create(this, playlist.get(musica));
+                total.setText(formato(reproductor.getDuration()));
+                reproductor.start();
+                startimer();
             }else{
                 musica--;
                 reproductor.stop();
                 reproductor.release();
+                handlertask = null;
                 reproductor = MediaPlayer.create(this, playlist.get(musica));
-
+                total.setText(formato(reproductor.getDuration()));
+                reproductor.start();
+                startimer();
             }
         }
     }
 
     public void siguiente(){
         if(reproductor.isPlaying()){
-            if(musica == playlist.size()) {
+            if(musica == playlist.size() -1) {
                 musica = 0;
                 reproductor.stop();
                 reproductor.release();
+                handlertask = null;
                 reproductor = MediaPlayer.create(this, playlist.get(musica));
+                total.setText(formato(reproductor.getDuration()));
+                reproductor.start();
+                startimer();
             }else{
                 musica++;
                 reproductor.stop();
                 reproductor.release();
+                handlertask = null;
                 reproductor = MediaPlayer.create(this, playlist.get(musica));
+                total.setText(formato(reproductor.getDuration()));
+                reproductor.start();
+                startimer();
             }
         }
+    }
+
+    public void startimer(){
+        handlertask = () -> {
+            actualizarinfo();
+            new Handler().postDelayed(handlertask, 1000);
+        };
+        handlertask.run();
     }
 
     public String formato(int millis){
@@ -147,6 +182,13 @@ public class MainActivity extends AppCompatActivity {
                 .setNegativeButton("No", null)
                 .setPositiveButton("Si", (dialog, which) -> finish())
                 .show();
+    }
+
+    public void actualizarinfo(){
+        if(reproductor.isPlaying()){
+            barra.setProgress(reproductor.getCurrentPosition());
+            reproduciendo.setText(formato(reproductor.getCurrentPosition()));
+        }
     }
 
     @Override
