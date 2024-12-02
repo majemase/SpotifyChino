@@ -21,18 +21,16 @@ import androidx.core.view.WindowInsetsCompat;
 import com.google.android.material.appbar.MaterialToolbar;
 
 import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
 
-    MaterialToolbar menu;
-    AlertDialog salir;
-    ImageButton btnplay, btnprev, btnsig;
-    MediaPlayer mp;
+    MediaPlayer reproductor;
     ArrayList<Integer> playlist = new ArrayList<>();
-    int cancion = 0;
+    int musica = 0;
+    Runnable handlertask;
+    TextView reproduciendo, total;
     SeekBar barra;
-    TextView total, reproduciendo;
-    Handler handler = new Handler();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,37 +43,26 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
-        init();
+        setSupportActionBar(findViewById(R.id.menu));
 
-        setSupportActionBar(menu);
+        playlist.add(R.raw.enemy);
+        playlist.add(R.raw.comeplay);
+        playlist.add(R.raw.toashes);
+        reproductor = MediaPlayer.create(this, playlist.get(0));
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        salir = builder.setCancelable(false)
-                .setTitle("Salir del programa")
-                .setMessage("¿Quieres salir del programa?")
-                .setNegativeButton("No", null)
-                .setPositiveButton("Si", (dialog, which) -> finish())
-                .create();
+        reproduciendo = findViewById(R.id.reproduciendo);
+        total = findViewById(R.id.total);
 
-        btnplay.setOnClickListener(v -> play(cancion));
+        reproduciendo.setText(formato(0));
+        total.setText(formato(reproductor.getDuration()));
 
-        btnplay.setOnLongClickListener(v -> {
-            if(mp != null){
-                mp.stop();
-                mp.release();
-                mp = null;
-            }
-            return true;
-        });
-
-        btnprev.setOnClickListener(v -> siguiente());
-        btnsig.setOnClickListener(v -> anterior());
-
+        barra = findViewById(R.id.barra);
+        barra.setMax(reproductor.getDuration());
         barra.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                if(mp.isPlaying()){
-                    mp.seekTo(i);
+                if(reproductor.isPlaying() && b){
+                    reproductor.seekTo(i);
                 }
             }
 
@@ -89,100 +76,89 @@ public class MainActivity extends AppCompatActivity {
 
             }
         });
+
+        findViewById(R.id.btnplay).setOnClickListener(v -> pausa());
+        findViewById(R.id.btnplay).setOnLongClickListener(v -> parar());
+        findViewById(R.id.btnprev).setOnClickListener(v -> anterior());
+        findViewById(R.id.btnsig).setOnClickListener(v -> siguiente());
     }
 
-    public void init(){
-        menu = findViewById(R.id.menu);
-        btnplay = findViewById(R.id.btnplay);
-        btnprev = findViewById(R.id.btnprev);
-        btnsig = findViewById(R.id.btnsig);
-        barra = findViewById(R.id.barra);
-        total = findViewById(R.id.total);
-        reproduciendo = findViewById(R.id.reproduciendo);
-        playlist.add(R.raw.enemy);
-        playlist.add(R.raw.comeplay);
-        playlist.add(R.raw.toashes);
-        mp = MediaPlayer.create(this, playlist.get(0));
+    public void pausa(){
+        if(reproductor.isPlaying()){
+            reproductor.pause();
+        }else{
+            reproductor.start();
+        }
     }
 
-    public void play(int indice) {
-        if (mp == null) {
-            mp = MediaPlayer.create(this, playlist.get(indice));
-            if (mp != null) {
-                mp.start();
-                barra.setMax(mp.getDuration());
-                total.setText(formatTime(mp.getDuration()));
-                empezartiempo();
-                btnplay.setImageResource(R.drawable.pausa);
-                mp.setOnCompletionListener(mediaPlayer -> siguiente());
-            }
-        } else {
-            if (mp.isPlaying()) {
-                mp.pause();
-                btnplay.setImageResource(R.drawable.play);
-            } else {
-                mp.start();
-                btnplay.setImageResource(R.drawable.pausa);
+    public boolean parar(){
+        if(reproductor.isPlaying()){
+            reproductor.stop();
+        }
+        return true;
+    }
+
+    public void anterior(){
+        if(reproductor.isPlaying()){
+            if(musica == 0){
+                musica = playlist.size() + 1;
+                reproductor.stop();
+                reproductor.release();
+                reproductor = MediaPlayer.create(this, playlist.get(musica));
+            }else{
+                musica--;
+                reproductor.stop();
+                reproductor.release();
+                reproductor = MediaPlayer.create(this, playlist.get(musica));
+
             }
         }
     }
 
-    public void empezartiempo() {
-        handler.removeCallbacksAndMessages(null);
-        Runnable handlertask = new Runnable() {
-            @Override
-            public void run() {
-                if (mp != null && mp.isPlaying()) {
-                    barra.setProgress(mp.getCurrentPosition());
-                    reproduciendo.setText(formatTime(mp.getCurrentPosition()));
-                    handler.postDelayed(this, 1000);
-                }
+    public void siguiente(){
+        if(reproductor.isPlaying()){
+            if(musica == playlist.size()) {
+                musica = 0;
+                reproductor.stop();
+                reproductor.release();
+                reproductor = MediaPlayer.create(this, playlist.get(musica));
+            }else{
+                musica++;
+                reproductor.stop();
+                reproductor.release();
+                reproductor = MediaPlayer.create(this, playlist.get(musica));
             }
-        };
-        handler.post(handlertask); // Ejecuta el Runnable
-    }
-
-    private String formatTime(int milliseconds) {
-        int min = (milliseconds / 1000) / 60;
-        int seg = (milliseconds / 1000) % 60;
-        return String.format("%02d:%02d", min, seg);
-    }
-
-    public void siguiente() {
-        if (playlist != null && !playlist.isEmpty()) {
-            if (mp != null) {
-                mp.stop();
-                mp.release();
-                mp = null;
-            }
-            cancion = (cancion + 1) % playlist.size();
-            play(cancion);
         }
     }
 
-    public void anterior() {
-        if (playlist != null && !playlist.isEmpty()) {
-            if (mp != null) {
-                mp.stop();
-                mp.release();
-                mp = null;
-            }
-            cancion = (cancion - 1 + playlist.size()) % playlist.size();
-            play(cancion);
-        }
+    public String formato(int millis){
+        return String.format("%02d : %02d",
+                TimeUnit.MILLISECONDS.toMinutes(millis),
+                TimeUnit.MILLISECONDS.toSeconds(millis) -
+                        TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis))
+        );
+    }
+
+    public void salir(){
+        AlertDialog.Builder alerta = new AlertDialog.Builder(this);
+        alerta.setCancelable(false)
+                .setTitle("Salir")
+                .setMessage("¿Quiere salir de la app?")
+                .setNegativeButton("No", null)
+                .setPositiveButton("Si", (dialog, which) -> finish())
+                .show();
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.menu, menu);
+        getMenuInflater().inflate(R.menu.menu, menu);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if(item.getItemId() == R.id.btnsalir){
-            salir.show();
+            salir();
         }
         return true;
     }
